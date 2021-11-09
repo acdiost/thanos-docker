@@ -1,0 +1,15 @@
+version: '3.0'
+services:
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    hostname: $HOSTNAME
+    network_mode: host
+    ports:
+      - "3100:3100"
+    volumes:
+      - /:/host:ro
+    command:
+      - "-config.file=/etc/loki/local-config.yaml"

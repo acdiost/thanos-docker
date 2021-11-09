@@ -1,0 +1,61 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: cluster_name
+    replica: 0
+    tenant: team
+    environment: prod
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/*.rules
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['IP:9090']
+  - job_name: 'minio-job'
+    # 生成命令: mc admin prometheus generate minio
+    bearer_token: eyJ
+    scheme: http
+    metrics_path: /minio/prometheus/metrics
+    static_configs:
+      - targets: ['IP:9000']
+  - job_name: 'sidecar'
+    static_configs:
+      - targets: ['sidecar:19090']
+  - job_name: 'querier'
+    static_configs:
+      - targets: ['querier:9091']
+  - job_name: 'store_gateway'
+    static_configs:
+      - targets: ['store-gateway:19091']
+  - job_name: 'node-exporter'
+    consul_sd_configs:
+      - server: 'IP:8500'
+        services: []  
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: .*node-exporter.*
+        action: keep
+      - regex: __meta_consul_service_metadata_(.+)
+        action: labelmap
+
+  - job_name: 'cadvisor-exproter'
+    consul_sd_configs:
+      - server: 'IP:8500'
+        services: []
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: .*cadvisor-exporter.*
+        action: keep
+      - regex: __meta_consul_service_metadata_(.+)
+        action: labelmap
+
+remote_write:
+- url: 'http://receive:10908/api/vi/receive'

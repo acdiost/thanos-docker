@@ -1,0 +1,39 @@
+version: '3.0'
+services:
+
+  node-exproter:
+    image: prom/node-exporter:latest
+    container_name: node-exproter
+    restart: unless-stopped
+    hostname: $HOSTNAME
+    network_mode: host
+#    ports:
+#      - "9100:9100"
+    cap_add:
+      - SYS_TIME
+    volumes:
+      - /:/host:ro
+      - /proc:/host/proc
+      - /sys:/host/sys
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+)($$|/)"
+      - "--collector.filesystem.ignored-fs-types=^(autofs|binfmt_misc|cgroup|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|sysfs|tracefs)$$"
+
+  cadvisor:
+    image: prom/cadvisor:v0.40.0
+    container_name: cadvisor
+    restart: unless-stopped
+    hostname: $HOSTNAME
+    privileged: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - "/dev/kmsg:/dev/kmsg"

@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: ganzi
+    replica: 0
+    tenant: chinacloud
+    environment: test
+
+rule_files:
+  - /etc/prometheus/*.rules
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+  - job_name: 'sidecar'
+    static_configs:
+      - targets: ['sidecar:19090']
+
+  - job_name: 'node-exporter'
+    consul_sd_configs:
+      - server: 'consul:8500'
+        services: []  
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: .*node-exporter.*
+        action: keep
+      - regex: __meta_consul_service_metadata_(.+)
+        action: labelmap
+  - job_name: 'cadvisor-exproter'
+    consul_sd_configs:
+      - server: 'consul:8500'
+        services: []
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: .*cadvisor-exporter.*
+        action: keep
+      - regex: __meta_consul_service_metadata_(.+)
+        action: labelmap
+

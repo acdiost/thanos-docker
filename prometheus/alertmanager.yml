@@ -1,0 +1,33 @@
+global:
+  resolve_timeout: 5m #处理超时时间，默认为5min
+  smtp_smarthost: 'smtp.163.com:25' # 邮箱smtp服务器代理
+  smtp_from: 'xxxxxxx@163.com' # 发送邮箱名称
+  smtp_auth_username: 'xxxxxxx@163.com' # 邮箱名称
+  smtp_auth_password: 'xxxxxxxxx' #邮箱密码
+
+templates:
+  - '*.tmpl'
+
+route:
+  group_by: ['job'] # 报警分组名称
+  group_wait: 1m  # 最初即第一次等待多久时间发送一组警报的通知
+  group_interval: 5m   # 在发送新警报前的等待时间
+  repeat_interval: 12h # 发送重复警报的周期
+  receiver: 'dingding'  # 发送警报的接收者的名称，以下receivers name的名称
+  routes:
+  - match:
+      severity: warning
+    receiver: 'dingding'
+  - match:
+      severity: critical
+    receiver: 'dingding'
+
+receivers:
+- name: 'dingding' #发送警报的接收者的名称
+  webhook_configs: #发送警报的接收者的配置
+  - url: 'http://IP:8060/dingtalk/webhook1/send' #发送者Url
+
+inhibit_rules:
+
+
+mute_time_intervals:

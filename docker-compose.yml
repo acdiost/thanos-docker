@@ -1,0 +1,130 @@
+version: '3.0'
+services:
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - "TZ=Asia/Shanghai"
+      - "GF_SECURITY_ADMIN_PASSWORD=grafana"
+      - "GF_PATHS_PROVISIONING=/etc/grafana/provisioning"
+      - "GF_AUTH_ANONYMOUS_ENABLED=true"
+      - "GF_USERS_DEFAULT_THEME=light"
+    ports:
+      - "80:3000"
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+      - ./grafana/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:z
+      - ./grafana/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:z
+      - ./grafana/node-exporter-dashboard.json:/grafana-dashboard-definitions/node-exporter-dashboard.json
+      - ./grafana/cadvisor-exporter-dashboard.json:/grafana-dashboard-definitions/cadvisor-exporter-dashboard.json
+      - ./grafana/minio_dashboards.json:/grafana-dashboard-definitions/minio_dashboards.json
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini"
+      - grafana_data:/var/lib/grafana
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "9090:9090"
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+      - "./prometheus/data:/prometheus:z"
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:z"
+      - "./prometheus/recording.rules:/etc/prometheus/recording.rules:z"
+    command: --web.enable-lifecycle --web.enable-admin-api --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --storage.tsdb.max-block-duration=2h --storage.tsdb.min-block-duration=2h --config.file=/etc/prometheus/prometheus.yml
+
+  alertmanager:
+    container_name: alertmanager
+    image: prom/alertmanager:latest
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yaml"
+      - "--storage.path=/var/lib/alertmanager"
+      - "--data.retention=120h"
+      - "--web.listen-address=:9093"
+      - "--web.route-prefix=/"
+    restart: always
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yaml:z
+      - alertmanager_data:/var/lib/alertmanager
+      - /etc/localtime:/etc/localtime
+    healthcheck:
+      test:  '/bin/wget -q -O - http://localhost:9093/-/healthy 2>&1 | grep OK || exit 1'
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  sidecar:
+    image: quay.io/thanos/thanos:v0.22.0
+    container_name: sidecar
+    restart: unless-stopped
+    user: root
+    ports:
+      - "19090:19090"
+      - "19190:19190"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+      - "./minio/bucket_storage.yaml:/etc/thanos/minio-bucket.yaml"
+      - "./prometheus/data:/prometheus:z"
+    command: "sidecar --tsdb.path /prometheus --objstore.config-file /etc/thanos/minio-bucket.yaml --shipper.upload-compacted --http-address 0.0.0.0:19090 --grpc-address 0.0.0.0:19190 --prometheus.url http://prometheus:9090"
+
+  store:
+    image: quay.io/thanos/thanos:v0.22.0
+    container_name: store-gateway
+    restart: unless-stopped
+    ports:
+      - "19091:19091"
+      - "19191:19191"
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+      - "./minio/bucket_storage.yaml:/etc/thanos/minio-bucket.yaml"
+    command: store --objstore.config-file /etc/thanos/minio-bucket.yaml --http-address 0.0.0.0:19091 --grpc-address 0.0.0.0:19191
+
+  querier:
+    image: quay.io/thanos/thanos:v0.22.0
+    container_name: querier
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+    # --store 要查询的 prometheus 集群组
+    command: query --http-address 0.0.0.0:9091 --query.replica-label replica --store sidecar:19190 --store store:19191
+
+  compact:
+    image: quay.io/thanos/thanos:v0.22.0
+    container_name: thanos-compact
+    restart: unless-stopped
+    ports:
+      - "19095:19095"
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+      - "./minio/bucket_storage.yaml:/etc/thanos/minio-bucket.yaml"
+    command: compact --wait --wait-interval 30s --consistency-delay 0s --objstore.config-file /etc/thanos/minio-bucket.yaml --http-address 0.0.0.0:19095
+
+  receive:
+    image: quay.io/thanos/thanos:v0.22.0
+    container_name: receive
+    restart: unless-stopped
+    ports:
+      - "10907:10907"
+      - "10909:10909"
+      - "10908:10908"
+    command: receive --tsdb.path "/receive/data" --grpc-address 0.0.0.0:10907 --http-address 0.0.0.0:10909 --label "receive_replica=\"0\"" --label "receive_cluster=\"wayne-enterprises\"" --remote-write.address 0.0.0.0:10908
+
+volumes:
+  alertmanager_data:
+  grafana_data:

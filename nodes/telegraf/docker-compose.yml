@@ -1,0 +1,22 @@
+version: '3'
+services:
+
+  telegraf:
+    image: telegraf/telegraf
+    container_name: telegraf
+    restart: unless-stopped
+    ports:
+      - "9273:9273"
+    environment:
+      HOST_PROC: /rootfs/proc
+      HOST_SYS: /rootfs/sys
+      HOST_ETC: /rootfs/etc
+    hostname: $HOSTNAME
+    volumes:
+     - ./telegraf.d:/etc/telegraf/telegraf.d:ro
+     - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+     - /sys:/rootfs/sys:ro
+     - /proc:/rootfs/proc:ro
+     - /etc:/rootfs/etc:ro
+    command: telegraf --config /etc/telegraf/telegraf.conf --config-directory /etc/telegraf/telegraf.d

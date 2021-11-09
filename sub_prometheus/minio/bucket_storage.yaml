@@ -1,0 +1,9 @@
+# minio 启动后手动创建
+type: S3
+config:
+  bucket: "thanos"
+  endpoint: "IP:9000"
+  insecure: true
+  signature_version2: true
+  access_key: "minio"
+  secret_key: "minio123"

@@ -1,0 +1,63 @@
+version: '3.0'
+services:
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "9090:9090"
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+      - "./prometheus/data:/prometheus:z"
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:z"
+      - "./prometheus/recording.rules:/etc/prometheus/recording.rules:z"
+    command: --web.enable-lifecycle --web.enable-admin-api --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=15d --storage.tsdb.max-block-duration=2h --storage.tsdb.min-block-duration=2h --config.file=/etc/prometheus/prometheus.yml
+
+  sidecar:
+    image: quay.io/thanos/thanos:v0.22.0
+    container_name: sidecar
+    restart: unless-stopped
+    user: root
+    ports:
+      - "19090:19090"
+      - "19190:19190"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - "/etc/locatime:/etc/locatime:ro"
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+      - "./minio/bucket_storage.yaml:/etc/thanos/minio-bucket.yaml"
+      - "./prometheus/data:/prometheus:z"
+    command: "sidecar --tsdb.path /prometheus --objstore.config-file /etc/thanos/minio-bucket.yaml --shipper.upload-compacted --http-address 0.0.0.0:19090 --grpc-address 0.0.0.0:19190 --prometheus.url http://prometheus:9090"
+
+  consul-server:
+    image: consul:latest
+    container_name: consul-server
+    restart: always
+    volumes:
+     - ./consul/server.json:/consul/config/server.json:ro
+    networks:
+      - consul
+    ports:
+      - "8500:8500"
+      - "8600:8600/tcp"
+      - "8600:8600/udp"
+    command: "agent"
+
+  consul-client:
+    image: consul:latest
+    container_name: consul-client
+    restart: always
+    volumes:
+     - ./consul/client.json:/consul/config/client.json:ro
+    networks:
+      - consul
+    command: "agent"
+
+networks:
+  prometheus:
+    driver: bridge
