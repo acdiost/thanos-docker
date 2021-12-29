@@ -2,9 +2,9 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    cluster: ganzi
+    cluster: test
     replica: 0
-    tenant: chinacloud
+    tenant: my-team
     environment: test
 
 rule_files:
