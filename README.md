@@ -9,6 +9,13 @@
 4. 部署 consul
 5. 部署 thanos
 
+替换 IP 的文件：
+- sub_prometheus/minio/bucket_storage.yaml
+- prometheus/prometheus.yml
+- prometheus/alertmanager.yml
+- minio/bucket_storage.yaml
+
+
 ## Grafana
 http://IP/
 
